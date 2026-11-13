@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>我的世界 网页版 - VoxelCraft</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #87ceeb;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+      touch-action: none;
+    }
+
+    #game-canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+    }
+
+    /* Crosshair */
+    #crosshair {
+      position: fixed;
+      left: 50%;
+      top: 50%;
+      width: 22px;
+      height: 22px;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      z-index: 10;
+    }
+    #crosshair::before,
+    #crosshair::after {
+      content: "";
+      position: absolute;
+      background: rgba(255, 255, 255, 0.88);
+      box-shadow: 0 0 2px rgba(0, 0, 0, 0.75);
+    }
+    #crosshair::before {
+      left: 10px;
+      top: 2px;
+      width: 2px;
+      height: 18px;
+    }
+    #crosshair::after {
+      left: 2px;
+      top: 10px;
+      width: 18px;
+      height: 2px;
+    }
+
+    /* Top HUD */
+    #top-bar {
+      position: fixed;
+      top: max(10px, env(safe-area-inset-top));
+      left: max(10px, env(safe-area-inset-left));
+      right: max(10px, env(safe-area-inset-right));
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      pointer-events: none;
+      z-index: 20;
+    }
+
+    #stats-pill {
+      background: rgba(18, 22, 28, 0.58);
+      color: #f3f6fa;
+      padding: 6px 10px;
+      border-radius: 8px;
+      font-size: 12px;
+      line-height: 1.4;
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+    }
+
+    #top-actions {
+      display: flex;
+      gap: 8px;
+      pointer-events: auto;
+    }
+
+    .hud-btn {
+      background: rgba(18, 22, 28, 0.65);
+      color: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      border-radius: 8px;
+      padding: 7px 11px;
+      font-size: 13px;
+      cursor: pointer;
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+    }
+    .hud-btn:active {
+      transform: scale(0.95);
+      background: rgba(255, 255, 255, 0.25);
+    }
+
+    /* Hotbar */
+    #hotbar {
+      position: fixed;
+      left: 50%;
+      bottom: max(12px, env(safe-area-inset-bottom));
+      transform: translateX(-50%);
+      display: flex;
+      gap: 4px;
+      padding: 5px;
+      background: rgba(20, 22, 26, 0.72);
+      border: 2px solid rgba(255, 255, 255, 0.22);
+      border-radius: 10px;
+      z-index: 25;
+      max-width: calc(100vw - 24px);
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    #hotbar::-webkit-scrollbar {
+      display: none;
+    }
+
+    .hotbar-slot {
+      width: 44px;
+      height: 44px;
+      flex: 0 0 44px;
+      border: 2px solid rgba(255, 255, 255, 0.22);
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.08);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      cursor: pointer;
+    }
+    .hotbar-slot.active {
+      border-color: #ffd54f;
+      background: rgba(255, 213, 79, 0.22);
+      box-shadow: 0 0 8px rgba(255, 213, 79, 0.45);
+    }
+    .hotbar-slot canvas {
+      width: 28px;
+      height: 28px;
+      image-rendering: pixelated;
+    }
+    .slot-num {
+      position: absolute;
+      top: 1px;
+      left: 3px;
+      font-size: 9px;
+      color: rgba(255, 255, 255, 0.8);
+      text-shadow: 0 1px 2px #000;
+    }
+
+    #block-label {
+      position: fixed;
+      left: 50%;
+      bottom: calc(max(12px, env(safe-area-inset-bottom)) + 64px);
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.58);
+      color: #fff;
+      padding: 3px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      pointer-events: none;
+      z-index: 20;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    #block-label.show {
+      opacity: 1;
+    }
+
+    /* Mobile Touch Controls */
+    #touch-controls {
+      display: none;
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 15;
+    }
+    body.is-touch #touch-controls {
+      display: block;
+    }
+
+    #joystick-zone {
+      position: absolute;
+      left: max(18px, env(safe-area-inset-left));
+      bottom: calc(max(18px, env(safe-area-inset-bottom)) + 66px);
+      width: 124px;
+      height: 124px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.14);
+      border: 2px solid rgba(255, 255, 255, 0.28);
+      pointer-events: auto;
+      touch-action: none;
+    }
+    #joystick-knob {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 50px;
+      height: 50px;
+      margin-left: -25px;
+      margin-top: -25px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.55);
+      border: 2px solid rgba(255, 255, 255, 0.85);
+      pointer-events: none;
+    }
+
+    #touch-actions {
+      position: absolute;
+      right: max(16px, env(safe-area-inset-right));
+      bottom: calc(max(18px, env(safe-area-inset-bottom)) + 68px);
+      display: grid;
+      grid-template-columns: 64px 64px;
+      gap: 10px;
+      pointer-events: auto;
+    }
+
+    .touch-action-btn {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      border: 2px solid rgba(255, 255, 255, 0.35);
+      background: rgba(18, 22, 28, 0.55);
+      color: #fff;
+      font-size: 14px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      touch-action: none;
+    }
+    .touch-action-btn:active,
+    .touch-action-btn.pressed {
+      background: rgba(255, 213, 79, 0.45);
+      border-color: #ffd54f;
+      transform: scale(0.94);
+    }
+    #btn-jump {
+      grid-column: 1 / span 2;
+      width: 100%;
+      height: 50px;
+      border-radius: 25px;
+    }
+
+    /* Start / Help Modal */
+    #overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(10, 14, 20, 0.72);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      z-index: 50;
+    }
+    #overlay.hidden {
+      display: none;
+    }
+
+    #modal-card {
+      width: 100%;
+      max-width: 440px;
+      background: rgba(26, 31, 40, 0.95);
+      color: #eef2f7;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 14px;
+      padding: 20px;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+    }
+    #modal-card h1 {
+      margin: 0 0 8px;
+      font-size: 20px;
+      color: #ffd54f;
+    }
+    #modal-card p {
+      margin: 6px 0;
+      font-size: 13px;
+      line-height: 1.55;
+      color: #cfd8e3;
+    }
+    .guide-box {
+      background: rgba(255, 255, 255, 0.06);
+      border-radius: 10px;
+      padding: 10px 12px;
+      margin: 10px 0;
+      font-size: 12.5px;
+      line-height: 1.6;
+    }
+    .modal-btns {
+      display: flex;
+      gap: 10px;
+      margin-top: 14px;
+    }
+    .primary-btn {
+      flex: 1;
+      padding: 11px 16px;
+      border: none;
+      border-radius: 9px;
+      background: #4caf50;
+      color: #fff;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .primary-btn:active {
+      background: #43a047;
+    }
+    .secondary-btn {
+      padding: 11px 14px;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      border-radius: 9px;
+      background: transparent;
+      color: #e2e8f0;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    @media (max-width: 600px) {
+      .hotbar-slot {
+        width: 38px;
+        height: 38px;
+        flex: 0 0 38px;
+      }
+      .hotbar-slot canvas {
+        width: 24px;
+        height: 24px;
+      }
+      #joystick-zone {
+        width: 110px;
+        height: 110px;
+      }
+      .touch-action-btn {
+        width: 58px;
+        height: 58px;
+      }
+      #touch-actions {
+        grid-template-columns: 58px 58px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="game-canvas"></canvas>
+  <div id="crosshair"></div>
+
+  <div id="top-bar">
+    <div id="stats-pill">加载中...</div>
+    <div id="top-actions">
+      <button class="hud-btn" id="btn-sound" title="开关音效">🔊 音效</button>
+      <button class="hud-btn" id="btn-mode" title="切换触屏/键鼠界面">📱 触控</button>
+      <button class="hud-btn" id="btn-help">❓ 帮助</button>
+    </div>
+  </div>
+
+  <div id="block-label">草方块</div>
+  <div id="hotbar"></div>
+
+  <div id="touch-controls">
+    <div id="joystick-zone">
+      <div id="joystick-knob"></div>
+    </div>
+    <div id="touch-actions">
+      <button class="touch-action-btn" id="btn-break">破坏</button>
+      <button class="touch-action-btn" id="btn-place">放置</button>
+      <button class="touch-action-btn" id="btn-jump">跳跃</button>
+    </div>
+  </div>
+
+  <div id="overlay">
+    <div id="modal-card">
+      <h1>我的世界 网页版</h1>
+      <p>纯网页 3D 体素沙盒，支持 Mac、iPhone 与安卓手机浏览器直接游玩，建造进度自动保存在本地。</p>
+      <div class="guide-box">
+        <strong>💻 Mac / 电脑操作：</strong><br />
+        • 点击画面锁定视角，移动鼠标转动视角（按 ESC 解锁）<br />
+        • <code>W A S D</code> 移动，<code>空格</code> 跳跃，<code>Shift</code> 加速跑<br />
+        • <code>左键</code> 破坏方块，<code>右键</code>（或 <code>F</code>）放置方块<br />
+        • 数字键 <code>1-9</code> 或滚轮切换方块
+      </div>
+      <div class="guide-box">
+        <strong>📱 iPhone / 安卓手机操作：</strong><br />
+        • 左下角摇杆控制前后左右移动<br />
+        • 屏幕右侧空白处滑动转动视角<br />
+        • 右下角按钮：<strong>破坏</strong> / <strong>放置</strong> / <strong>跳跃</strong>，点底部快捷栏选方块
+      </div>
+      <div class="modal-btns">
+        <button class="primary-btn" id="btn-start">开始游戏</button>
+        <button class="secondary-btn" id="btn-reset">重置世界</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="./game.js"></script>
+</body>
+</html>
