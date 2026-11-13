@@ -999,7 +999,27 @@
     btnJump.classList.remove('pressed');
   });
 
-  // ---------- Resize ----------
+  // ---------- Fullscreen & Resize ----------
+  const btnFullscreen = document.getElementById('btn-fullscreen');
+  if (btnFullscreen && document.documentElement.requestFullscreen) {
+    btnFullscreen.style.display = '';
+    btnFullscreen.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().then(() => {
+          if (isTouchMode && screen.orientation && screen.orientation.lock) {
+            screen.orientation.lock('landscape').catch(() => {});
+          }
+        }).catch(() => {});
+      } else {
+        document.exitFullscreen().catch(() => {});
+      }
+    });
+    document.addEventListener('fullscreenchange', () => {
+      btnFullscreen.textContent = document.fullscreenElement ? '⛶ 退出' : '⛶ 全屏';
+    });
+  }
+
   function resizeCanvas() {
     const dpr = Math.min(window.devicePixelRatio || 1, isTouchMode ? 1.5 : 2);
     const w = Math.floor(window.innerWidth * dpr);
@@ -1011,6 +1031,9 @@
     }
   }
   window.addEventListener('resize', resizeCanvas);
+  window.addEventListener('orientationchange', () => {
+    setTimeout(resizeCanvas, 150);
+  });
   resizeCanvas();
 
   // ---------- Main Loop ----------
